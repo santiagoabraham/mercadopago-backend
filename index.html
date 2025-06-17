@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Consulta de Socios</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Consulta de Socio</h1>
+    <input type="text" id="dniInput" placeholder="Ingresá tu DNI" />
+    <button onclick="buscarSocio()">Buscar</button>
+
+    <div id="resultado" class="card"></div>
+    <div id="qrcode"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,8 +1,3 @@
-<<<<<<< HEAD
 Flask==2.3.2
 mercadopago==2.3.0
-=======
-Flask==2.3.2
-mercadopago==2.3.0
->>>>>>> 7eb45ece9389eb940ea82348a323bf8002ba7df8
 gunicorn==20.1.0

@@ -42,8 +42,20 @@ function buscarSocio() {
 
         resultadoDiv.innerHTML = html;
 
-        const linkPago = `https://www.mercadopago.com.ar/pagar?dni=${dni}&monto=${total.toFixed(2)}`;
-        new QRCode(qrDiv, linkPago);
+        // Nuevo: llamada al backend real para generar QR
+          fetch(`https://backend-mercadopago-ulig.onrender.com/crear_qr?dni=${dni}&total=${total}`)
+            .then(response => {
+              if (!response.ok) throw new Error("No se pudo generar el link de pago");
+              return response.json();
+            })
+            .then(data => {
+              qrDiv.innerHTML = "";
+              new QRCode(qrDiv, data.link);
+            })
+            .catch(error => {
+              qrDiv.innerHTML = "Error al generar el código QR.";
+              console.error(error);
+            });
       } else {
         resultadoDiv.innerHTML = "No se encontró ningún socio con ese DNI.";
       }

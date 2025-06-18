@@ -88,7 +88,7 @@ def webhook():
                 if not dni:
                     preference_id = info.get("preference_id")
                     print(f"🔍 preference_id recibido en el webhook: {preference_id}")
-                    dni, comprobantes = recuperar_preference(preference_id)
+                    dni, comprobantes = recuperar_preference(preference_id, return_comprobantes=True)
                     print(f"🔁 Recuperado DNI desde preferencias: {dni}")
 
                 if dni:
@@ -110,13 +110,8 @@ def estado_pago():
     dni = request.args.get('dni')
     comprobantes = request.args.get('comprobantes', '').split(',')
     pagos = cargar_json(ARCHIVO_PAGOS)
-    pagado = dni in pagos and all(c in pagos[dni] for c in comprobantes)
-    return jsonify({"pagado": pagado})
-
-@app.route('/ver_preferencias')
-def ver_preferencias():
-    preferencias = cargar_json(ARCHIVO_PREFERENCIAS)
-    return jsonify(preferencias)
+    comprobantes_pagados = pagos.get(dni, [])
+    return jsonify({"pagado": any(c in comprobantes_pagados for c in comprobantes)})
 
 # ======================
 # Funciones auxiliares
@@ -126,19 +121,22 @@ def guardar_pago(dni, comprobantes):
     pagos = cargar_json(ARCHIVO_PAGOS)
     if dni not in pagos:
         pagos[dni] = []
-    for comp in comprobantes:
-        if comp and comp not in pagos[dni]:
-            pagos[dni].append(comp)
+    for c in comprobantes:
+        if c not in pagos[dni]:
+            pagos[dni].append(c)
     guardar_json(ARCHIVO_PAGOS, pagos)
 
 def guardar_preference(preference_id, dni, comprobantes):
     preferencias = cargar_json(ARCHIVO_PREFERENCIAS)
-    preferencias[preference_id] = [dni, comprobantes]
+    preferencias[preference_id] = {"dni": dni, "comprobantes": comprobantes}
     guardar_json(ARCHIVO_PREFERENCIAS, preferencias)
 
-def recuperar_preference(preference_id):
+def recuperar_preference(preference_id, return_comprobantes=False):
     preferencias = cargar_json(ARCHIVO_PREFERENCIAS)
-    return preferencias.get(preference_id, (None, []))
+    entry = preferencias.get(preference_id, {})
+    if return_comprobantes:
+        return entry.get("dni"), entry.get("comprobantes", [])
+    return entry.get("dni")
 
 def cargar_json(path):
     with open(path, "r") as f:
@@ -147,3 +145,8 @@ def cargar_json(path):
 def guardar_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f)
+
+@app.route('/ver_preferencias')
+def ver_preferencias():
+    preferencias = cargar_json(ARCHIVO_PREFERENCIAS)
+    return jsonify(preferencias)

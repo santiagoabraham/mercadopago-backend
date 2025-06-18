@@ -82,9 +82,11 @@ def webhook():
         if mp_response.status_code == 200:
             info = mp_response.json()
             if info.get("status") == "approved":
+                # Intentar recuperar desde metadata
                 dni = info.get("metadata", {}).get("dni")
                 comprobantes = info.get("metadata", {}).get("comprobantes", [])
 
+                # Si falla, buscar por preference_id
                 if not dni:
                     preference_id = info.get("preference_id")
                     print(f"🔍 preference_id recibido en el webhook: {preference_id}")

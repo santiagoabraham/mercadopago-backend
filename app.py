@@ -36,6 +36,8 @@ def crear_qr():
         "notification_url": "https://backend-mercadopago-ulig.onrender.com/webhook"
     }
 
+    print("🧾 Enviando preferencia:", json.dumps(preference_data, indent=2))  # <--- AGREGADO
+
     response = requests.post(
         "https://api.mercadopago.com/checkout/preferences",
         json=preference_data,

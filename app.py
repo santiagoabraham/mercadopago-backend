@@ -58,8 +58,13 @@ def crear_qr():
 # ✅ Webhook que recibe las notificaciones de pago
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.json
+    # Primero intentamos obtener el ID desde JSON (modo recomendado)
+    data = request.json or {}
     payment_id = data.get("data", {}).get("id")
+
+    # Si no vino en JSON, lo tomamos desde los parámetros de la URL
+    if not payment_id:
+        payment_id = request.args.get("data.id")
 
     if payment_id:
         # Consultar estado del pago
@@ -73,7 +78,16 @@ def webhook():
                 dni = info.get("metadata", {}).get("dni")
                 if dni:
                     guardar_pago(dni)
-                    print(f"Pago aprobado para DNI {dni}")
+                    print(f"✅ Pago aprobado para DNI {dni}")
+                else:
+                    print(f"⚠️ Pago aprobado sin DNI (ID {payment_id})")
+            else:
+                print(f"ℹ️ Pago recibido pero no aprobado (ID {payment_id})")
+        else:
+            print(f"❌ Error consultando el pago (ID {payment_id})")
+    else:
+        print("⚠️ Webhook recibido sin ID de pago")
+
     return "", 200
 
 

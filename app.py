@@ -2,8 +2,11 @@ from flask import Flask, request, jsonify
 import requests
 import json
 import os
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app, origins=["https://santiagoabraham.github.io"])
+
 ACCESS_TOKEN = "TEST-2710442383202823-060714-a1ca2431f069e5b9555443aaeeddcc8b-271027138"
 ARCHIVO_PAGOS = "pagos_confirmados.json"
 

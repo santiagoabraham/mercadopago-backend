@@ -9,15 +9,16 @@ CORS(app, origins=["https://santiagoabraham.github.io"])
 
 ACCESS_TOKEN = "APP_USR-2710442383202823-060714-af7765619bcfa3f7fb6444bda9638b7f-271027138"
 ARCHIVO_PAGOS = "pagos_confirmados.json"
+ARCHIVO_PREFERENCIAS = "preferencias_temp.json"
 
 
-# Inicializar archivo si no existe
-if not os.path.exists(ARCHIVO_PAGOS):
-    with open(ARCHIVO_PAGOS, "w") as f:
-        json.dump({}, f)
+# Inicializar archivos si no existen
+for archivo in [ARCHIVO_PAGOS, ARCHIVO_PREFERENCIAS]:
+    if not os.path.exists(archivo):
+        with open(archivo, "w") as f:
+            json.dump({}, f)
 
 
-# ✅ Crear QR y guardar DNI + total en preferencia
 @app.route('/crear_qr')
 def crear_qr():
     dni = request.args.get('dni')
@@ -36,8 +37,6 @@ def crear_qr():
         "notification_url": "https://backend-mercadopago-ulig.onrender.com/webhook"
     }
 
-    print("🧾 Enviando preferencia:", json.dumps(preference_data, indent=2))  # <--- AGREGADO
-
     response = requests.post(
         "https://api.mercadopago.com/checkout/preferences",
         json=preference_data,
@@ -49,26 +48,26 @@ def crear_qr():
 
     if response.status_code == 201:
         resp_json = response.json()
+        preference_id = resp_json.get("id")
+        if preference_id:
+            guardar_preference(preference_id, dni)
+            print(f"📦 Guardado preference {preference_id} para DNI {dni}")
+
         return jsonify({
             "link": resp_json["init_point"],
-            "id": resp_json["id"]
+            "id": preference_id
         })
     else:
         return jsonify({"error": "No se pudo generar el link"}), 500
 
 
-# ✅ Webhook que recibe las notificaciones de pago
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    # 1. Intentar desde el JSON (modo ideal, pero poco usado por MP)
     data = request.json or {}
     payment_id = data.get("data", {}).get("id")
-
-    # 2. Intentar desde query string `data.id` o `id`
     if not payment_id:
         payment_id = request.args.get("data.id") or request.args.get("id")
 
-    # Confirmar que es un webhook de tipo "payment"
     topic = request.args.get("type") or request.args.get("topic")
     if topic != "payment":
         print(f"🔎 Webhook ignorado (tipo {topic})")
@@ -85,13 +84,20 @@ def webhook():
             info = mp_response.json()
             if info.get("status") == "approved":
                 dni = info.get("metadata", {}).get("dni")
+
+                # Fallback: recuperar el dni por preference_id
+                if not dni:
+                    preference_id = info.get("payment_method_reference_id") or info.get("preference_id")
+                    dni = recuperar_preference(preference_id)
+                    print(f"🔁 Recuperado DNI desde preferencias: {dni}")
+
                 if dni:
                     guardar_pago(dni)
                     print(f"✅ Pago aprobado para DNI {dni}")
                 else:
-                    print(f"⚠️ Pago aprobado sin DNI (ID {payment_id})")
+                    print(f"⚠️ Pago aprobado pero sin DNI (ID {payment_id})")
             else:
-                print(f"ℹ️ Pago recibido pero NO aprobado: {info.get('status')} (ID {payment_id})")
+                print(f"ℹ️ Pago recibido pero no aprobado: {info.get('status')} (ID {payment_id})")
         else:
             print(f"❌ Error al consultar pago (ID {payment_id}): {mp_response.status_code}")
     else:
@@ -100,23 +106,35 @@ def webhook():
     return "", 200
 
 
-
-# ✅ Verificar si un DNI ya pagó
 @app.route('/estado_pago')
 def estado_pago():
     dni = request.args.get('dni')
-    pagos = cargar_pagos()
+    pagos = cargar_json(ARCHIVO_PAGOS)
     return jsonify({"pagado": dni in pagos})
 
 
-# ✅ Funciones auxiliares
+# ======================
+# Funciones auxiliares
+# ======================
+
 def guardar_pago(dni):
-    pagos = cargar_pagos()
+    pagos = cargar_json(ARCHIVO_PAGOS)
     pagos[dni] = True
-    with open(ARCHIVO_PAGOS, "w") as f:
-        json.dump(pagos, f)
+    guardar_json(ARCHIVO_PAGOS, pagos)
 
+def guardar_preference(preference_id, dni):
+    preferencias = cargar_json(ARCHIVO_PREFERENCIAS)
+    preferencias[preference_id] = dni
+    guardar_json(ARCHIVO_PREFERENCIAS, preferencias)
 
-def cargar_pagos():
-    with open(ARCHIVO_PAGOS, "r") as f:
+def recuperar_preference(preference_id):
+    preferencias = cargar_json(ARCHIVO_PREFERENCIAS)
+    return preferencias.get(preference_id)
+
+def cargar_json(path):
+    with open(path, "r") as f:
         return json.load(f)
+
+def guardar_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f)

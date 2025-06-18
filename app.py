@@ -1,53 +1,95 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # ✅ Habilita CORS
-import mercadopago
+import requests
+import json
 import os
 
 app = Flask(__name__)
-CORS(app)  # ✅ Esto permite que tu frontend desde GitHub Pages se conecte
-
-# Access token de MercadoPago (modo test o real)
 ACCESS_TOKEN = "TEST-2710442383202823-060714-a1ca2431f069e5b9555443aaeeddcc8b-271027138"
-sdk = mercadopago.SDK(ACCESS_TOKEN)
+ARCHIVO_PAGOS = "pagos_confirmados.json"
 
-@app.route('/crear_qr', methods=['GET'])
+
+# Inicializar archivo si no existe
+if not os.path.exists(ARCHIVO_PAGOS):
+    with open(ARCHIVO_PAGOS, "w") as f:
+        json.dump({}, f)
+
+
+# ✅ Crear QR y guardar DNI + total en preferencia
+@app.route('/crear_qr')
 def crear_qr():
-    dni = request.args.get("dni")
-    total = request.args.get("total")
+    dni = request.args.get('dni')
+    total = request.args.get('total')
 
-    if not dni or not total:
-        return jsonify({"error": "Faltan parámetros"}), 400
+    preference_data = {
+        "items": [{
+            "title": f"Pago Socio DNI {dni}",
+            "quantity": 1,
+            "currency_id": "ARS",
+            "unit_price": float(total)
+        }],
+        "metadata": {
+            "dni": dni
+        },
+        "notification_url": "https://backend-mercadopago-ulig.onrender.com/webhook"
+    }
 
-    try:
-        preference_data = {
-            "items": [
-                {
-                    "title": f"Pago de cuotas - DNI {dni}",
-                    "quantity": 1,
-                    "unit_price": float(total),
-                    "currency_id": "ARS"
-                }
-            ],
-            "metadata": {
-                "dni": dni
-            },
-            "external_reference": dni,
-            "notification_url": "https://tusitio.com/webhook",
-            "back_urls": {
-                "success": "https://tusitio.com/pago-exitoso",
-                "failure": "https://tusitio.com/pago-fallido",
-                "pending": "https://tusitio.com/pago-pendiente"
-            },
-            "auto_return": "approved"
+    response = requests.post(
+        "https://api.mercadopago.com/checkout/preferences",
+        json=preference_data,
+        headers={
+            "Authorization": f"Bearer {ACCESS_TOKEN}",
+            "Content-Type": "application/json"
         }
+    )
 
-        preference = sdk.preference().create(preference_data)
-        init_point = preference["response"]["init_point"]
+    if response.status_code == 201:
+        resp_json = response.json()
+        return jsonify({
+            "link": resp_json["init_point"],
+            "id": resp_json["id"]
+        })
+    else:
+        return jsonify({"error": "No se pudo generar el link"}), 500
 
-        return jsonify({"link": init_point})
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# ✅ Webhook que recibe las notificaciones de pago
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.json
+    payment_id = data.get("data", {}).get("id")
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    if payment_id:
+        # Consultar estado del pago
+        mp_response = requests.get(
+            f"https://api.mercadopago.com/v1/payments/{payment_id}",
+            headers={"Authorization": f"Bearer {ACCESS_TOKEN}"}
+        )
+        if mp_response.status_code == 200:
+            info = mp_response.json()
+            if info.get("status") == "approved":
+                dni = info.get("metadata", {}).get("dni")
+                if dni:
+                    guardar_pago(dni)
+                    print(f"Pago aprobado para DNI {dni}")
+    return "", 200
+
+
+# ✅ Verificar si un DNI ya pagó
+@app.route('/estado_pago')
+def estado_pago():
+    dni = request.args.get('dni')
+    pagos = cargar_pagos()
+    return jsonify({"pagado": dni in pagos})
+
+
+# ✅ Funciones auxiliares
+def guardar_pago(dni):
+    pagos = cargar_pagos()
+    pagos[dni] = True
+    with open(ARCHIVO_PAGOS, "w") as f:
+        json.dump(pagos, f)
+
+
+def cargar_pagos():
+    with open(ARCHIVO_PAGOS, "r") as f:
+        return json.load(f)

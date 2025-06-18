@@ -8,15 +8,19 @@
 </head>
 <body>
   <div class="container">
-    <h1>Consulta de Socio</h1>
-    <input type="text" id="dniInput" placeholder="Ingresá tu DNI" />
-    <button onclick="buscarSocio()">Buscar</button>
+    <img src="https://hebraica.org.ar/wp-content/uploads/theme/logo.png" alt="Logo" class="logo"/>
+
+    <h1>Consulta de Deuda</h1>
+
+    <input type="text" id="dniInput" placeholder="Ingresá tu DNI" inputmode="numeric" />
+
+    <button onclick="buscarSocio()">Consultar</button>
 
     <div id="resultado" class="card"></div>
-    <div id="qrcode"></div>
+    <div id="qrcode" class="qr"></div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

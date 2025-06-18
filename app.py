@@ -87,7 +87,8 @@ def webhook():
 
                 # Fallback: recuperar el dni por preference_id
                 if not dni:
-                    preference_id = info.get("payment_method_reference_id") or info.get("preference_id")
+                    preference_id = info.get("preference_id")
+                    print(f"🔍 preference_id recibido en el webhook: {preference_id}")
                     dni = recuperar_preference(preference_id)
                     print(f"🔁 Recuperado DNI desde preferencias: {dni}")
 
@@ -138,3 +139,8 @@ def cargar_json(path):
 def guardar_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f)
+        
+@app.route('/ver_preferencias')
+def ver_preferencias():
+    preferencias = cargar_json(ARCHIVO_PREFERENCIAS)
+    return jsonify(preferencias)

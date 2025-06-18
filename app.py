@@ -58,20 +58,27 @@ def crear_qr():
 # ✅ Webhook que recibe las notificaciones de pago
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    # Primero intentamos obtener el ID desde JSON (modo recomendado)
+    # 1. Intentar desde el JSON (modo ideal, pero poco usado por MP)
     data = request.json or {}
     payment_id = data.get("data", {}).get("id")
 
-    # Si no vino en JSON, lo tomamos desde los parámetros de la URL
+    # 2. Intentar desde query string `data.id` o `id`
     if not payment_id:
-        payment_id = request.args.get("data.id")
+        payment_id = request.args.get("data.id") or request.args.get("id")
+
+    # Confirmar que es un webhook de tipo "payment"
+    topic = request.args.get("type") or request.args.get("topic")
+    if topic != "payment":
+        print(f"🔎 Webhook ignorado (tipo {topic})")
+        return "", 200
 
     if payment_id:
-        # Consultar estado del pago
+        print(f"🔔 Webhook recibido con ID de pago: {payment_id}")
         mp_response = requests.get(
             f"https://api.mercadopago.com/v1/payments/{payment_id}",
             headers={"Authorization": f"Bearer {ACCESS_TOKEN}"}
         )
+
         if mp_response.status_code == 200:
             info = mp_response.json()
             if info.get("status") == "approved":
@@ -82,13 +89,14 @@ def webhook():
                 else:
                     print(f"⚠️ Pago aprobado sin DNI (ID {payment_id})")
             else:
-                print(f"ℹ️ Pago recibido pero no aprobado (ID {payment_id})")
+                print(f"ℹ️ Pago recibido pero NO aprobado: {info.get('status')} (ID {payment_id})")
         else:
-            print(f"❌ Error consultando el pago (ID {payment_id})")
+            print(f"❌ Error al consultar pago (ID {payment_id}): {mp_response.status_code}")
     else:
         print("⚠️ Webhook recibido sin ID de pago")
 
     return "", 200
+
 
 
 # ✅ Verificar si un DNI ya pagó
